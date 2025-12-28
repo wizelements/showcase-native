@@ -1,0 +1,43 @@
+id: agency-portfolio
+name: "Agency Portfolio"
+tagline: "Modern creative agency site with CMS"
+description: |
+  Full-stack portfolio website for a creative agency featuring headless CMS, 
+  smooth animations, and blazing-fast performance. Includes contact forms, 
+  case study showcases, and team member profiles.
+
+urls:
+  live: "https://cod3black.dev"
+  github: "https://github.com/cod3black/agency-portfolio"
+
+tech_stack:
+  - name: "Next.js"
+    color: "#000000"
+  - name: "Sanity"
+    color: "#F03E2F"
+  - name: "Tailwind"
+    color: "#06B6D4"
+  - name: "Vercel"
+    color: "#000000"
+
+metrics:
+  monthly_visitors: "12K"
+  lighthouse_score: 98
+  project_value: "$15,000"
+  build_time: "3 weeks"
+
+story:
+  problem: "Agency had outdated WordPress with 5+ second load times and poor mobile experience"
+  solution: "Built JAMstack architecture with headless CMS for content flexibility"
+  results: "3x faster load times, 50% more leads, 98 Lighthouse score"
+
+client:
+  name: "Creative Studio XYZ"
+  testimonial: "Exceeded all expectations. The new site has transformed our online presence."
+
+tags:
+  - web
+  - portfolio
+  - cms
+featured: true
+order: 1
