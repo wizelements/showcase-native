@@ -1,12 +1,13 @@
 [app]
-# Showcase - Portfolio App
-title = Showcase
-package.name = showcase
+# Showcase Pro - Portfolio App
+title = Showcase Pro
+package.name = showcasepro
 package.domain = dev.cod3black
 source.dir = .
 source.include_exts = py,png,jpg,kv,atlas,yml,json
+source.include_patterns = assets/*
 source.exclude_patterns = .github_cache.json,.git,__pycache__,*.pyc,build.log
-version = 1.0.0
+version = 1.1.0
 
 # Requirements (pyjnius pinned for Python 3.11 compatibility)
 requirements = python3,kivy,pillow,qrcode,pyyaml,pyjnius==1.6.1,certifi
@@ -27,8 +28,8 @@ orientation = portrait
 fullscreen = 0
 android.presplash_color = #0a0a0f
 
-# Icon (create a 512x512 icon.png in assets/)
-# icon.filename = assets/icon.png
+# Icon
+icon.filename = assets/icon.png
 
 # Build settings
 log_level = 2

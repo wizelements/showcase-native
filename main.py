@@ -57,16 +57,25 @@ from kivy.properties import StringProperty, ListProperty, ObjectProperty
 # ═══════════════════════════════════════════════════════════
 
 COLORS = {
-    'bg_primary': '#0a0a0f',
-    'bg_secondary': '#1a1a2e',
-    'bg_card': '#12121a',
-    'accent': '#6366f1',
-    'accent_light': '#818cf8',
-    'text_primary': '#ffffff',
-    'text_secondary': '#94a3b8',
+    'bg_primary': '#0d0d12',
+    'bg_secondary': '#16161e',
+    'bg_card': '#1a1a24',
+    'bg_card_hover': '#222230',
+    'accent': '#7c3aed',
+    'accent_light': '#a78bfa',
+    'accent_glow': '#8b5cf6',
+    'gradient_start': '#6366f1',
+    'gradient_end': '#8b5cf6',
+    'text_primary': '#f8fafc',
+    'text_secondary': '#cbd5e1',
     'text_muted': '#64748b',
-    'success': '#10b981',
-    'border': '#1e1e2e',
+    'success': '#22c55e',
+    'success_glow': '#4ade80',
+    'warning': '#f59e0b',
+    'border': '#2d2d3a',
+    'border_glow': '#7c3aed',
+    'gold': '#fbbf24',
+    'silver': '#94a3b8',
 }
 
 def hex_to_rgba(hex_color, alpha=1):
@@ -378,6 +387,45 @@ def generate_qr_texture(url, size=256):
 # Custom Widgets
 # ═══════════════════════════════════════════════════════════
 
+class GlowCard(BoxLayout):
+    """Beautiful card with glow effect and gradient border"""
+    
+    def __init__(self, glow_color=None, **kwargs):
+        super().__init__(**kwargs)
+        self.orientation = 'vertical'
+        self.padding = dp(20)
+        self.spacing = dp(14)
+        self.glow_color = glow_color or COLORS['accent_glow']
+        
+        with self.canvas.before:
+            Color(*hex_to_rgba(self.glow_color, 0.15))
+            self.glow = RoundedRectangle(
+                pos=(self.x - dp(4), self.y - dp(4)),
+                size=(self.width + dp(8), self.height + dp(8)),
+                radius=[dp(24)]
+            )
+            Color(*hex_to_rgba(COLORS['bg_card']))
+            self.bg = RoundedRectangle(
+                pos=self.pos,
+                size=self.size,
+                radius=[dp(20)]
+            )
+            Color(*hex_to_rgba(self.glow_color, 0.5))
+            self.border = Line(
+                rounded_rectangle=[*self.pos, *self.size, dp(20)],
+                width=1.5
+            )
+        
+        self.bind(pos=self._update_graphics, size=self._update_graphics)
+    
+    def _update_graphics(self, *args):
+        self.glow.pos = (self.x - dp(4), self.y - dp(4))
+        self.glow.size = (self.width + dp(8), self.height + dp(8))
+        self.bg.pos = self.pos
+        self.bg.size = self.size
+        self.border.rounded_rectangle = [*self.pos, *self.size, dp(20)]
+
+
 class RoundedCard(BoxLayout):
     """Card with rounded corners and shadow effect"""
     
@@ -408,116 +456,179 @@ class RoundedCard(BoxLayout):
         self.border.rounded_rectangle = [*self.pos, *self.size, dp(16)]
 
 
-class ProjectCard(RoundedCard):
-    """Individual project display card"""
+class GradientButton(Button):
+    """Button with gradient-like appearance"""
     
-    def __init__(self, project, on_qr=None, on_visit=None, **kwargs):
+    def __init__(self, **kwargs):
         super().__init__(**kwargs)
+        self.background_normal = ''
+        self.background_color = (0, 0, 0, 0)
+        
+        with self.canvas.before:
+            Color(*hex_to_rgba(COLORS['accent']))
+            self.bg = RoundedRectangle(
+                pos=self.pos,
+                size=self.size,
+                radius=[dp(12)]
+            )
+        
+        self.bind(pos=self._update_bg, size=self._update_bg)
+    
+    def _update_bg(self, *args):
+        self.bg.pos = self.pos
+        self.bg.size = self.size
+
+
+class ProjectCard(GlowCard):
+    """Individual project display card with enhanced styling"""
+    
+    def __init__(self, project, index=0, on_qr=None, on_visit=None, **kwargs):
+        glow_colors = [COLORS['accent_glow'], COLORS['success'], COLORS['gold'], COLORS['accent_light']]
+        super().__init__(glow_color=glow_colors[index % len(glow_colors)], **kwargs)
         self.project = project
         self.on_qr_callback = on_qr
         self.on_visit_callback = on_visit
         self.size_hint = (None, None)
-        self.size = (dp(300), dp(380))
+        self.size = (dp(320), dp(420))
         
         self._build_ui()
     
     def _build_ui(self):
-        # Status indicator
-        status_box = BoxLayout(size_hint_y=None, height=dp(24))
-        status_box.add_widget(Label(
-            text='🟢 Live',
-            font_size=sp(12),
-            color=hex_to_rgba(COLORS['success']),
-            halign='left',
-            size_hint_x=None,
-            width=dp(60)
-        ))
-        status_box.add_widget(BoxLayout())  # Spacer
-        self.add_widget(status_box)
+        # Header with status and order badge
+        header = BoxLayout(size_hint_y=None, height=dp(32))
         
-        # Project name
+        # Status indicator with animation-like styling
+        status_box = BoxLayout(size_hint_x=None, width=dp(80))
+        status_box.add_widget(Label(
+            text='● LIVE',
+            font_size=sp(11),
+            bold=True,
+            color=hex_to_rgba(COLORS['success']),
+            halign='left'
+        ))
+        header.add_widget(status_box)
+        
+        header.add_widget(BoxLayout())
+        
+        # Order badge
+        order = self.project.get('order', 0)
+        if order > 0:
+            badge = Label(
+                text=f'#{order}',
+                font_size=sp(12),
+                bold=True,
+                color=hex_to_rgba(COLORS['gold']),
+                size_hint_x=None,
+                width=dp(40)
+            )
+            header.add_widget(badge)
+        
+        self.add_widget(header)
+        
+        # Project name with larger font
+        name = self.project.get('name', 'Untitled')
         self.add_widget(Label(
-            text=self.project.get('name', 'Untitled'),
-            font_size=sp(22),
+            text=name,
+            font_size=sp(24),
             bold=True,
             color=hex_to_rgba(COLORS['text_primary']),
             halign='left',
             valign='middle',
             size_hint_y=None,
-            height=dp(32),
-            text_size=(dp(268), None)
+            height=dp(36),
+            text_size=(dp(280), None)
         ))
         
-        # Tagline
-        self.add_widget(Label(
-            text=self.project.get('tagline', ''),
-            font_size=sp(14),
-            color=hex_to_rgba(COLORS['text_secondary']),
-            halign='left',
-            valign='top',
-            size_hint_y=None,
-            height=dp(40),
-            text_size=(dp(268), None)
-        ))
+        # Tagline with better styling
+        tagline = self.project.get('tagline', '')
+        if tagline:
+            self.add_widget(Label(
+                text=tagline,
+                font_size=sp(14),
+                color=hex_to_rgba(COLORS['text_secondary']),
+                halign='left',
+                valign='top',
+                size_hint_y=None,
+                height=dp(44),
+                text_size=(dp(280), None)
+            ))
         
-        # Tech stack
-        tech_box = BoxLayout(size_hint_y=None, height=dp(36), spacing=dp(8))
+        # Tech stack with pill-style badges
+        tech_box = BoxLayout(size_hint_y=None, height=dp(40), spacing=dp(6))
         tech_stack = self.project.get('tech_stack', [])
-        for tech in tech_stack[:4]:
+        for tech in tech_stack[:3]:
             tech_name = tech.get('name', tech) if isinstance(tech, dict) else tech
-            btn = Button(
+            pill = Button(
                 text=tech_name,
-                font_size=sp(11),
+                font_size=sp(10),
+                bold=True,
                 size_hint=(None, None),
-                size=(dp(70), dp(28)),
-                background_color=hex_to_rgba(COLORS['accent'], 0.2),
+                size=(dp(max(60, len(tech_name) * 8)), dp(28)),
+                background_color=hex_to_rgba(COLORS['accent'], 0.25),
                 color=hex_to_rgba(COLORS['accent_light'])
             )
-            btn.background_normal = ''
-            tech_box.add_widget(btn)
-        tech_box.add_widget(BoxLayout())  # Spacer
+            pill.background_normal = ''
+            tech_box.add_widget(pill)
+        if len(tech_stack) > 3:
+            more = Button(
+                text=f'+{len(tech_stack)-3}',
+                font_size=sp(10),
+                size_hint=(None, None),
+                size=(dp(36), dp(28)),
+                background_color=hex_to_rgba(COLORS['border'], 0.5),
+                color=hex_to_rgba(COLORS['text_muted'])
+            )
+            more.background_normal = ''
+            tech_box.add_widget(more)
+        tech_box.add_widget(BoxLayout())
         self.add_widget(tech_box)
         
-        # Metrics
+        # Metrics with icons
         metrics = self.project.get('metrics', {})
         if metrics:
-            metrics_box = BoxLayout(size_hint_y=None, height=dp(32), spacing=dp(16))
-            for key, value in list(metrics.items())[:2]:
+            metrics_box = BoxLayout(size_hint_y=None, height=dp(36), spacing=dp(20))
+            icons = {'stars': '⭐', 'forks': '🔀', 'downloads': '📥', 'visitors': '👁', 
+                     'rating': '⭐', 'uptime': '🟢', 'score': '📊', 'clients': '👥'}
+            for key, value in list(metrics.items())[:3]:
+                icon = icons.get(key.lower(), '📌')
                 metrics_box.add_widget(Label(
-                    text=f"{value}",
-                    font_size=sp(12),
-                    color=hex_to_rgba(COLORS['text_muted']),
-                    halign='left'
+                    text=f'{icon} {value}',
+                    font_size=sp(13),
+                    color=hex_to_rgba(COLORS['text_secondary']),
+                    halign='left',
+                    size_hint_x=None,
+                    width=dp(80)
                 ))
+            metrics_box.add_widget(BoxLayout())
             self.add_widget(metrics_box)
         
         # Spacer
         self.add_widget(BoxLayout())
         
-        # Action buttons
-        btn_box = BoxLayout(size_hint_y=None, height=dp(44), spacing=dp(12))
+        # Action buttons with better styling
+        btn_box = BoxLayout(size_hint_y=None, height=dp(50), spacing=dp(12))
         
-        # Visit button
+        # Visit button (primary)
         visit_btn = Button(
-            text='Visit Site',
-            font_size=sp(14),
+            text='🚀 Visit',
+            font_size=sp(15),
             bold=True,
             background_color=hex_to_rgba(COLORS['accent']),
             color=hex_to_rgba(COLORS['text_primary']),
-            size_hint_x=0.6
+            size_hint_x=0.55
         )
         visit_btn.background_normal = ''
         visit_btn.bind(on_release=self._on_visit)
         btn_box.add_widget(visit_btn)
         
-        # QR button
+        # QR button (secondary)
         qr_btn = Button(
-            text='QR',
-            font_size=sp(14),
+            text='📱 QR',
+            font_size=sp(15),
             bold=True,
             background_color=hex_to_rgba(COLORS['bg_secondary']),
-            color=hex_to_rgba(COLORS['text_primary']),
-            size_hint_x=0.4
+            color=hex_to_rgba(COLORS['accent_light']),
+            size_hint_x=0.45
         )
         qr_btn.background_normal = ''
         qr_btn.bind(on_release=self._on_qr)
@@ -680,10 +791,11 @@ class HomeScreen(Screen):
             size_hint_y=0.75
         )
         
-        for project in self.projects:
-            card_container = BoxLayout(padding=dp(24))
+        for i, project in enumerate(self.projects):
+            card_container = BoxLayout(padding=dp(20))
             card = ProjectCard(
                 project,
+                index=i,
                 on_qr=self._show_qr,
                 on_visit=self._visit_site
             )
