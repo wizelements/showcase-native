@@ -8,8 +8,11 @@ Built with Kivy
 import os
 import json
 import yaml
+import urllib.request
+import urllib.error
 from pathlib import Path
 from io import BytesIO
+from datetime import datetime, timedelta
 import qrcode
 from PIL import Image as PILImage
 
@@ -61,13 +64,117 @@ def hex_to_rgba(hex_color, alpha=1):
 # Data Loading
 # ═══════════════════════════════════════════════════════════
 
+CACHE_FILE = Path(__file__).parent / '.github_cache.json'
+
+def fetch_github_pinned_repos(username):
+    """Fetch pinned repositories from GitHub using REST API"""
+    try:
+        url = f"https://api.github.com/users/{username}/repos?sort=updated&per_page=100"
+        req = urllib.request.Request(url, headers={
+            'Accept': 'application/vnd.github.v3+json',
+            'User-Agent': 'Showcase-App'
+        })
+        with urllib.request.urlopen(req, timeout=10) as response:
+            repos = json.loads(response.read().decode())
+        
+        pinned_url = f"https://gh-pinned-repos-tsj7ta5xfhep.deno.dev/?username={username}"
+        try:
+            req = urllib.request.Request(pinned_url, headers={'User-Agent': 'Showcase-App'})
+            with urllib.request.urlopen(req, timeout=10) as response:
+                pinned = json.loads(response.read().decode())
+                if pinned:
+                    return [convert_pinned_to_project(p, i) for i, p in enumerate(pinned)]
+        except Exception as e:
+            print(f"Pinned API failed, using top repos: {e}")
+        
+        top_repos = [r for r in repos if not r.get('fork')][:6]
+        return [convert_repo_to_project(r, i) for i, r in enumerate(top_repos)]
+        
+    except Exception as e:
+        print(f"GitHub fetch error: {e}")
+        return None
+
+def convert_pinned_to_project(pinned, order):
+    """Convert pinned repo format to project format"""
+    return {
+        'id': pinned.get('repo', f'project-{order}'),
+        'name': pinned.get('repo', 'Untitled'),
+        'tagline': pinned.get('description', '')[:80] if pinned.get('description') else '',
+        'description': pinned.get('description', ''),
+        'url': pinned.get('link', ''),
+        'tech_stack': [pinned.get('language', 'Code')] if pinned.get('language') else [],
+        'metrics': {
+            'stars': str(pinned.get('stars', 0)),
+            'forks': str(pinned.get('forks', 0))
+        },
+        'tags': ['github', pinned.get('language', '').lower()] if pinned.get('language') else ['github'],
+        'order': order
+    }
+
+def convert_repo_to_project(repo, order):
+    """Convert GitHub repo to project format"""
+    return {
+        'id': repo.get('name', f'project-{order}'),
+        'name': repo.get('name', 'Untitled'),
+        'tagline': (repo.get('description', '') or '')[:80],
+        'description': repo.get('description', ''),
+        'url': repo.get('html_url', ''),
+        'tech_stack': [repo.get('language', 'Code')] if repo.get('language') else [],
+        'metrics': {
+            'stars': str(repo.get('stargazers_count', 0)),
+            'forks': str(repo.get('forks_count', 0))
+        },
+        'tags': ['github', (repo.get('language', '') or '').lower()],
+        'order': order
+    }
+
+def load_cached_github(config):
+    """Load GitHub repos from cache if valid"""
+    if not CACHE_FILE.exists():
+        return None
+    try:
+        cache = json.loads(CACHE_FILE.read_text())
+        cached_time = datetime.fromisoformat(cache.get('timestamp', '2000-01-01'))
+        ttl = config.get('github', {}).get('cache_ttl_minutes', 30)
+        if datetime.now() - cached_time < timedelta(minutes=ttl):
+            return cache.get('projects', [])
+    except Exception as e:
+        print(f"Cache read error: {e}")
+    return None
+
+def save_github_cache(projects):
+    """Save projects to cache"""
+    try:
+        CACHE_FILE.write_text(json.dumps({
+            'timestamp': datetime.now().isoformat(),
+            'projects': projects
+        }, indent=2))
+    except Exception as e:
+        print(f"Cache write error: {e}")
+
 def load_projects():
-    """Load projects from YAML/JSON files"""
+    """Load projects from GitHub pinned repos or local files"""
+    config = load_config()
+    github_config = config.get('github', {})
+    
+    if github_config.get('use_pinned') and github_config.get('username'):
+        cached = load_cached_github(config)
+        if cached:
+            print("📦 Using cached GitHub projects")
+            return cached
+        
+        print(f"🔄 Fetching GitHub pinned repos for {github_config['username']}...")
+        projects = fetch_github_pinned_repos(github_config['username'])
+        if projects:
+            save_github_cache(projects)
+            print(f"✅ Loaded {len(projects)} projects from GitHub")
+            return projects
+        print("⚠️ Falling back to local projects")
+    
     projects = []
     projects_dir = Path(__file__).parent / 'projects'
     
     if not projects_dir.exists():
-        # Create sample projects
         projects_dir.mkdir(exist_ok=True)
         create_sample_projects(projects_dir)
     

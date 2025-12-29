@@ -3,5 +3,10 @@
     "name": "Cod3BlackAgency",
     "tagline": "Building Digital Excellence",
     "website": "https://cod3black.dev"
+  },
+  "github": {
+    "username": "wizelements",
+    "use_pinned": true,
+    "cache_ttl_minutes": 30
   }
 }
