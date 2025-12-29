@@ -5,6 +5,7 @@ package.name = showcase
 package.domain = dev.cod3black
 source.dir = .
 source.include_exts = py,png,jpg,kv,atlas,yml,json
+source.exclude_patterns = .github_cache.json,.git,__pycache__,*.pyc,build.log
 version = 1.0.0
 
 # Requirements (pyjnius pinned for Python 3.11 compatibility)
