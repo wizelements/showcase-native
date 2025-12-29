@@ -10,11 +10,28 @@ import json
 import yaml
 import urllib.request
 import urllib.error
+import ssl
+import certifi
 from pathlib import Path
 from io import BytesIO
 from datetime import datetime, timedelta
 import qrcode
 from PIL import Image as PILImage
+
+def get_ssl_context():
+    """Get SSL context that works on Android"""
+    try:
+        ctx = ssl.create_default_context(cafile=certifi.where())
+        return ctx
+    except Exception:
+        pass
+    try:
+        ctx = ssl.create_default_context()
+        ctx.check_hostname = False
+        ctx.verify_mode = ssl.CERT_NONE
+        return ctx
+    except Exception:
+        return None
 
 from kivy.app import App
 from kivy.uix.screenmanager import ScreenManager, Screen, SlideTransition
@@ -66,29 +83,57 @@ def hex_to_rgba(hex_color, alpha=1):
 
 CACHE_FILE = Path(__file__).parent / '.github_cache.json'
 
+def fetch_url_with_retry(url, headers=None, retries=3, timeout=15):
+    """Fetch URL with SSL fallback and retries for Android compatibility"""
+    if headers is None:
+        headers = {'User-Agent': 'Showcase-App/1.0'}
+    
+    req = urllib.request.Request(url, headers=headers)
+    ssl_ctx = get_ssl_context()
+    
+    for attempt in range(retries):
+        try:
+            if ssl_ctx:
+                with urllib.request.urlopen(req, timeout=timeout, context=ssl_ctx) as response:
+                    return json.loads(response.read().decode())
+            else:
+                with urllib.request.urlopen(req, timeout=timeout) as response:
+                    return json.loads(response.read().decode())
+        except ssl.SSLError as e:
+            print(f"SSL error (attempt {attempt+1}): {e}")
+            ssl_ctx = ssl.create_default_context()
+            ssl_ctx.check_hostname = False
+            ssl_ctx.verify_mode = ssl.CERT_NONE
+        except urllib.error.URLError as e:
+            print(f"URL error (attempt {attempt+1}): {e}")
+        except Exception as e:
+            print(f"Fetch error (attempt {attempt+1}): {e}")
+    return None
+
 def fetch_github_pinned_repos(username):
     """Fetch pinned repositories from GitHub using REST API"""
     try:
-        url = f"https://api.github.com/users/{username}/repos?sort=updated&per_page=100"
-        req = urllib.request.Request(url, headers={
-            'Accept': 'application/vnd.github.v3+json',
-            'User-Agent': 'Showcase-App'
-        })
-        with urllib.request.urlopen(req, timeout=10) as response:
-            repos = json.loads(response.read().decode())
-        
         pinned_url = f"https://gh-pinned-repos-tsj7ta5xfhep.deno.dev/?username={username}"
-        try:
-            req = urllib.request.Request(pinned_url, headers={'User-Agent': 'Showcase-App'})
-            with urllib.request.urlopen(req, timeout=10) as response:
-                pinned = json.loads(response.read().decode())
-                if pinned:
-                    return [convert_pinned_to_project(p, i) for i, p in enumerate(pinned)]
-        except Exception as e:
-            print(f"Pinned API failed, using top repos: {e}")
+        print(f"🔗 Fetching from: {pinned_url}")
+        pinned = fetch_url_with_retry(pinned_url)
+        if pinned and isinstance(pinned, list) and len(pinned) > 0:
+            print(f"✅ Got {len(pinned)} pinned repos")
+            return [convert_pinned_to_project(p, i) for i, p in enumerate(pinned)]
         
-        top_repos = [r for r in repos if not r.get('fork')][:6]
-        return [convert_repo_to_project(r, i) for i, r in enumerate(top_repos)]
+        print("⚠️ Pinned API empty, trying GitHub API...")
+        url = f"https://api.github.com/users/{username}/repos?sort=updated&per_page=100"
+        repos = fetch_url_with_retry(url, headers={
+            'Accept': 'application/vnd.github.v3+json',
+            'User-Agent': 'Showcase-App/1.0'
+        })
+        
+        if repos and isinstance(repos, list):
+            top_repos = [r for r in repos if not r.get('fork')][:6]
+            print(f"✅ Got {len(top_repos)} repos from GitHub API")
+            return [convert_repo_to_project(r, i) for i, r in enumerate(top_repos)]
+        
+        print("❌ All GitHub fetches failed")
+        return None
         
     except Exception as e:
         print(f"GitHub fetch error: {e}")
@@ -152,48 +197,90 @@ def save_github_cache(projects):
     except Exception as e:
         print(f"Cache write error: {e}")
 
+def get_bundled_projects():
+    """Return bundled projects as ultimate fallback"""
+    return [
+        {
+            'id': 'showcase-native',
+            'name': 'Showcase Native',
+            'tagline': 'Portfolio app for Android',
+            'description': 'Native Android portfolio app built with Kivy',
+            'url': 'https://github.com/wizelements/showcase-native',
+            'tech_stack': ['Python', 'Kivy', 'Android'],
+            'metrics': {'stars': '⭐', 'status': 'Live'},
+            'tags': ['mobile', 'portfolio'],
+            'order': 1
+        },
+        {
+            'id': 'github-profile',
+            'name': 'GitHub Profile',
+            'tagline': 'Check out all repositories',
+            'description': 'View full GitHub profile and all projects',
+            'url': 'https://github.com/wizelements',
+            'tech_stack': ['GitHub'],
+            'metrics': {'repos': 'All', 'type': 'Profile'},
+            'tags': ['github', 'profile'],
+            'order': 2
+        },
+        {
+            'id': 'cod3black-dev',
+            'name': 'Cod3Black Agency',
+            'tagline': 'Building Digital Excellence',
+            'description': 'Full-stack development agency portfolio',
+            'url': 'https://cod3black.dev',
+            'tech_stack': ['Next.js', 'React', 'Node.js'],
+            'metrics': {'clients': 'Active', 'rating': '5⭐'},
+            'tags': ['web', 'agency'],
+            'order': 3
+        }
+    ]
+
 def load_projects():
-    """Load projects from GitHub pinned repos or local files"""
+    """Load projects from GitHub pinned repos with robust fallback"""
     config = load_config()
     github_config = config.get('github', {})
     
     if github_config.get('use_pinned') and github_config.get('username'):
         cached = load_cached_github(config)
-        if cached:
-            print("📦 Using cached GitHub projects")
+        if cached and len(cached) > 0:
+            print(f"📦 Using {len(cached)} cached GitHub projects")
             return cached
         
         print(f"🔄 Fetching GitHub pinned repos for {github_config['username']}...")
         projects = fetch_github_pinned_repos(github_config['username'])
-        if projects:
+        if projects and len(projects) > 0:
             save_github_cache(projects)
             print(f"✅ Loaded {len(projects)} projects from GitHub")
             return projects
-        print("⚠️ GitHub fetch failed - returning empty list")
-        return []
+        
+        print("⚠️ GitHub fetch failed - using bundled projects")
+        bundled = get_bundled_projects()
+        print(f"📱 Loaded {len(bundled)} bundled projects")
+        return bundled
     
     projects = []
     projects_dir = Path(__file__).parent / 'projects'
     
-    if not projects_dir.exists():
-        projects_dir.mkdir(exist_ok=True)
-        create_sample_projects(projects_dir)
+    if projects_dir.exists():
+        for f in sorted(projects_dir.glob('*.yml')):
+            try:
+                data = yaml.safe_load(f.read_text())
+                if data:
+                    projects.append(data)
+            except Exception as e:
+                print(f"Error loading {f}: {e}")
+        
+        for f in sorted(projects_dir.glob('*.json')):
+            try:
+                data = json.loads(f.read_text())
+                if data:
+                    projects.append(data)
+            except Exception as e:
+                print(f"Error loading {f}: {e}")
     
-    for f in sorted(projects_dir.glob('*.yml')):
-        try:
-            data = yaml.safe_load(f.read_text())
-            if data:
-                projects.append(data)
-        except Exception as e:
-            print(f"Error loading {f}: {e}")
-    
-    for f in sorted(projects_dir.glob('*.json')):
-        try:
-            data = json.loads(f.read_text())
-            if data:
-                projects.append(data)
-        except Exception as e:
-            print(f"Error loading {f}: {e}")
+    if not projects:
+        print("📱 No local projects found - using bundled projects")
+        return get_bundled_projects()
     
     projects.sort(key=lambda p: (p.get('order', 999), p.get('name', '')))
     return projects

@@ -9,7 +9,7 @@ source.exclude_patterns = .github_cache.json,.git,__pycache__,*.pyc,build.log
 version = 1.0.0
 
 # Requirements (pyjnius pinned for Python 3.11 compatibility)
-requirements = python3,kivy,pillow,qrcode,pyyaml,pyjnius==1.6.1
+requirements = python3,kivy,pillow,qrcode,pyyaml,pyjnius==1.6.1,certifi
 
 # Android settings
 android.permissions = INTERNET
