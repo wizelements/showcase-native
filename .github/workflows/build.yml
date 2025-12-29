@@ -65,6 +65,14 @@ jobs:
           # Pin Cython <3.0 for pyjnius compatibility
           pip install buildozer "cython<3.0" virtualenv
 
+      - name: Free up disk space
+        run: |
+          # Remove unnecessary pre-installed tools to save space
+          sudo rm -rf /usr/local/lib/android/sdk/ndk/26* /usr/local/lib/android/sdk/ndk/27* || true
+          sudo rm -rf /usr/share/dotnet || true
+          sudo rm -rf /opt/ghc || true
+          df -h
+          
       - name: Setup Android SDK for Buildozer
         run: |
           # Accept all licenses
@@ -77,28 +85,27 @@ jobs:
             "build-tools;33.0.2" \
             "ndk;25.2.9519653"
           
-          # Remove any stale cached SDK to ensure fresh copy
+          # Remove any stale cached SDK
           rm -rf ~/.buildozer/android/platform/android-sdk
           rm -rf ~/.buildozer/android/platform/android-ndk-r25b
           
-          # Create buildozer expected directory structure
+          # Create buildozer expected directory structure using symlinks (saves disk space)
           mkdir -p ~/.buildozer/android/platform
-          
-          # Copy SDK to buildozer location (symlinks don't work well with buildozer)
-          cp -r $ANDROID_HOME ~/.buildozer/android/platform/android-sdk
+          ln -sf $ANDROID_HOME ~/.buildozer/android/platform/android-sdk
           
           # Create NDK symlink with expected name
-          ln -sf ~/.buildozer/android/platform/android-sdk/ndk/25.2.9519653 ~/.buildozer/android/platform/android-ndk-r25b
+          ln -sf $ANDROID_HOME/ndk/25.2.9519653 ~/.buildozer/android/platform/android-ndk-r25b
           
           # Create legacy tools/bin path for sdkmanager (buildozer expects old structure)
-          mkdir -p ~/.buildozer/android/platform/android-sdk/tools/bin
-          ln -sf ~/.buildozer/android/platform/android-sdk/cmdline-tools/latest/bin/sdkmanager ~/.buildozer/android/platform/android-sdk/tools/bin/sdkmanager
+          mkdir -p $ANDROID_HOME/tools/bin
+          ln -sf $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager $ANDROID_HOME/tools/bin/sdkmanager
           
           # Verify build-tools exist
           echo "=== Verifying SDK installation ==="
           ls -la ~/.buildozer/android/platform/android-sdk/build-tools/33.0.2/
           ls -la ~/.buildozer/android/platform/android-sdk/tools/bin/
           test -f ~/.buildozer/android/platform/android-sdk/build-tools/33.0.2/aidl || exit 1
+          df -h
 
       - name: Build APK
         run: |
