@@ -30,7 +30,7 @@ jobs:
           path: |
             ~/.buildozer
             .buildozer
-          key: buildozer-${{ runner.os }}-${{ hashFiles('buildozer.spec') }}
+          key: buildozer-${{ runner.os }}-${{ hashFiles('buildozer.spec') }}-v2
           restore-keys: |
             buildozer-${{ runner.os }}-
 
@@ -65,7 +65,7 @@ jobs:
           pip install --upgrade pip setuptools wheel
           pip install buildozer cython virtualenv
 
-      - name: Setup Android SDK
+      - name: Setup Android SDK for Buildozer
         run: |
           # Accept all licenses
           yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses || true
@@ -77,18 +77,18 @@ jobs:
             "build-tools;33.0.2" \
             "ndk;25.2.9519653"
           
-          # Create symlink for NDK version naming (25b -> 25.2.9519653)
+          # Create buildozer directory structure
           mkdir -p ~/.buildozer/android/platform
-          ln -sf $ANDROID_HOME/ndk/25.2.9519653 ~/.buildozer/android/platform/android-ndk-r25b || true
+          
+          # Symlink the system SDK to where buildozer expects it
+          ln -sf $ANDROID_HOME ~/.buildozer/android/platform/android-sdk
+          
+          # Symlink NDK with the expected name
+          ln -sf $ANDROID_HOME/ndk/25.2.9519653 ~/.buildozer/android/platform/android-ndk-r25b
 
       - name: Build APK
-        env:
-          ANDROID_NDK_HOME: /usr/local/lib/android/sdk/ndk/25.2.9519653
-          ANDROIDSDK: /usr/local/lib/android/sdk
-          ANDROIDNDK: /usr/local/lib/android/sdk/ndk/25.2.9519653
-          ANDROIDAPI: "31"
-          ANDROIDMINAPI: "21"
         run: |
+          # Run buildozer
           buildozer -v android debug 2>&1 | tee build.log
           
       - name: Upload APK
@@ -96,6 +96,7 @@ jobs:
         with:
           name: showcase-apk
           path: bin/*.apk
+          if-no-files-found: error
           
       - name: Upload build log on failure
         if: failure()
