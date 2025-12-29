@@ -30,7 +30,7 @@ jobs:
           path: |
             ~/.buildozer
             .buildozer
-          key: buildozer-${{ runner.os }}-${{ hashFiles('buildozer.spec') }}-v3
+          key: buildozer-${{ runner.os }}-${{ hashFiles('buildozer.spec') }}-v4
           restore-keys: |
             buildozer-${{ runner.os }}-
 
@@ -76,7 +76,11 @@ jobs:
             "build-tools;33.0.2" \
             "ndk;25.2.9519653"
           
-          # Create buildozer expected directory structure with actual copies
+          # Remove any stale cached SDK to ensure fresh copy
+          rm -rf ~/.buildozer/android/platform/android-sdk
+          rm -rf ~/.buildozer/android/platform/android-ndk-r25b
+          
+          # Create buildozer expected directory structure
           mkdir -p ~/.buildozer/android/platform
           
           # Copy SDK to buildozer location (symlinks don't work well with buildozer)
@@ -85,8 +89,10 @@ jobs:
           # Create NDK symlink with expected name
           ln -sf ~/.buildozer/android/platform/android-sdk/ndk/25.2.9519653 ~/.buildozer/android/platform/android-ndk-r25b
           
-          # Verify aidl exists
-          ls -la ~/.buildozer/android/platform/android-sdk/build-tools/33.0.2/aidl
+          # Verify build-tools exist
+          echo "=== Verifying SDK installation ==="
+          ls -la ~/.buildozer/android/platform/android-sdk/build-tools/33.0.2/
+          test -f ~/.buildozer/android/platform/android-sdk/build-tools/33.0.2/aidl || exit 1
 
       - name: Build APK
         run: |
