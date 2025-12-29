@@ -8,7 +8,7 @@ on:
 jobs:
   build:
     runs-on: ubuntu-22.04
-    timeout-minutes: 60
+    timeout-minutes: 90
     
     steps:
       - uses: actions/checkout@v4
@@ -16,7 +16,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: '3.10'
 
       - name: Set up Java
         uses: actions/setup-java@v4
@@ -24,15 +24,27 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
+      - name: Free up disk space
+        run: |
+          # Remove unnecessary pre-installed tools to save space (~15GB freed)
+          sudo rm -rf /usr/local/lib/android/sdk/ndk/26* /usr/local/lib/android/sdk/ndk/27* || true
+          sudo rm -rf /usr/share/dotnet || true
+          sudo rm -rf /opt/ghc || true
+          sudo rm -rf /usr/local/share/boost || true
+          sudo rm -rf /opt/hostedtoolcache/CodeQL || true
+          echo "=== Disk space after cleanup ==="
+          df -h /
+
       - name: Cache Buildozer
         uses: actions/cache@v4
         with:
           path: |
-            ~/.buildozer
-            .buildozer
-          key: buildozer-${{ runner.os }}-${{ hashFiles('buildozer.spec') }}-v5
-          restore-keys: |
-            buildozer-${{ runner.os }}-
+            ~/.buildozer/android/platform/python-for-android
+            ~/.buildozer/android/platform/apache-ant-*
+            .buildozer/android/platform/build-*/dists
+            .buildozer/android/platform/build-*/build/bootstrap_builds
+          key: buildozer-${{ runner.os }}-${{ hashFiles('buildozer.spec') }}-v6
+          # No restore-keys fallback - prevents stale cache issues
 
       - name: Install system dependencies
         run: |
@@ -62,17 +74,9 @@ jobs:
       - name: Install Python dependencies
         run: |
           pip install --upgrade pip setuptools wheel
-          # Pin Cython <3.0 for pyjnius compatibility
+          # Pin Cython <3.0 for pyjnius compatibility with Python 3.10
           pip install buildozer "cython<3.0" virtualenv
 
-      - name: Free up disk space
-        run: |
-          # Remove unnecessary pre-installed tools to save space
-          sudo rm -rf /usr/local/lib/android/sdk/ndk/26* /usr/local/lib/android/sdk/ndk/27* || true
-          sudo rm -rf /usr/share/dotnet || true
-          sudo rm -rf /opt/ghc || true
-          df -h
-          
       - name: Setup Android SDK for Buildozer
         run: |
           # Accept all licenses
@@ -85,7 +89,7 @@ jobs:
             "build-tools;33.0.2" \
             "ndk;25.2.9519653"
           
-          # Remove any stale cached SDK
+          # Remove any stale cached SDK symlinks
           rm -rf ~/.buildozer/android/platform/android-sdk
           rm -rf ~/.buildozer/android/platform/android-ndk-r25b
           
@@ -102,19 +106,25 @@ jobs:
           
           # Verify build-tools exist
           echo "=== Verifying SDK installation ==="
-          ls -la ~/.buildozer/android/platform/android-sdk/build-tools/33.0.2/
-          ls -la ~/.buildozer/android/platform/android-sdk/tools/bin/
-          test -f ~/.buildozer/android/platform/android-sdk/build-tools/33.0.2/aidl || exit 1
-          df -h
+          ls -la ~/.buildozer/android/platform/android-sdk/build-tools/33.0.2/ | head -5
+          test -f ~/.buildozer/android/platform/android-sdk/build-tools/33.0.2/aidl
+          echo "=== Disk space before build ==="
+          df -h /
 
       - name: Build APK
         run: |
-          # Clean any cached pyjnius build to force fresh compilation
+          # Clean any cached pyjnius/kivy builds that might have Cython issues
           rm -rf ~/.buildozer/android/platform/build-*/build/other_builds/pyjnius* || true
+          rm -rf ~/.buildozer/android/platform/build-*/build/other_builds/kivy* || true
           rm -rf .buildozer/android/platform/build-*/build/other_builds/pyjnius* || true
+          rm -rf .buildozer/android/platform/build-*/build/other_builds/kivy* || true
           
-          # Run buildozer
+          # Run buildozer with verbose output
           buildozer -v android debug 2>&1 | tee build.log
+          
+          # Show final disk usage
+          echo "=== Final disk space ==="
+          df -h /
           
       - name: Upload APK
         uses: actions/upload-artifact@v4
