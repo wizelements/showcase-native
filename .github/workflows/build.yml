@@ -35,9 +35,9 @@ jobs:
             libtool \
             pkg-config \
             zlib1g-dev \
-            libncurses5-dev \
-            libncursesw5-dev \
-            libtinfo5 \
+            libncurses-dev \
+            libncursesw6 \
+            libtinfo6 \
             cmake \
             libffi-dev \
             libssl-dev \
