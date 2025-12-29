@@ -62,7 +62,8 @@ jobs:
       - name: Install Python dependencies
         run: |
           pip install --upgrade pip setuptools wheel
-          pip install buildozer cython virtualenv
+          # Pin Cython <3.0 for pyjnius compatibility
+          pip install buildozer "cython<3.0" virtualenv
 
       - name: Setup Android SDK for Buildozer
         run: |
