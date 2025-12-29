@@ -169,7 +169,8 @@ def load_projects():
             save_github_cache(projects)
             print(f"✅ Loaded {len(projects)} projects from GitHub")
             return projects
-        print("⚠️ Falling back to local projects")
+        print("⚠️ GitHub fetch failed - returning empty list")
+        return []
     
     projects = []
     projects_dir = Path(__file__).parent / 'projects'
