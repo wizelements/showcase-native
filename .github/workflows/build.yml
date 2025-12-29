@@ -43,7 +43,7 @@ jobs:
             ~/.buildozer/android/platform/apache-ant-*
             .buildozer/android/platform/build-*/dists
             .buildozer/android/platform/build-*/build/bootstrap_builds
-          key: buildozer-${{ runner.os }}-${{ hashFiles('buildozer.spec') }}-v6
+          key: buildozer-${{ runner.os }}-${{ hashFiles('buildozer.spec') }}-v7
           # No restore-keys fallback - prevents stale cache issues
 
       - name: Install system dependencies
