@@ -30,7 +30,7 @@ jobs:
           path: |
             ~/.buildozer
             .buildozer
-          key: buildozer-${{ runner.os }}-${{ hashFiles('buildozer.spec') }}-v4
+          key: buildozer-${{ runner.os }}-${{ hashFiles('buildozer.spec') }}-v5
           restore-keys: |
             buildozer-${{ runner.os }}-
 
@@ -101,6 +101,10 @@ jobs:
 
       - name: Build APK
         run: |
+          # Clean any cached pyjnius build to force fresh compilation
+          rm -rf ~/.buildozer/android/platform/build-*/build/other_builds/pyjnius* || true
+          rm -rf .buildozer/android/platform/build-*/build/other_builds/pyjnius* || true
+          
           # Run buildozer
           buildozer -v android debug 2>&1 | tee build.log
           
