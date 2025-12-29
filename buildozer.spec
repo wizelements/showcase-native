@@ -7,8 +7,8 @@ source.dir = .
 source.include_exts = py,png,jpg,kv,atlas,yml,json
 version = 1.0.0
 
-# Requirements
-requirements = python3,kivy,pillow,qrcode,pyyaml
+# Requirements (pyjnius pinned for Python 3.11 compatibility)
+requirements = python3,kivy,pillow,qrcode,pyyaml,pyjnius==1.6.1
 
 # Android settings
 android.permissions = INTERNET
